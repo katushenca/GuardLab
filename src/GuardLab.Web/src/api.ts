@@ -6,7 +6,7 @@ export type LabRun = {
     safeResponse: unknown;
     explanation: string
 };
-const bases = window.location.hostname === 'localhost' && window.location.port === '8080' ? ['http://localhost:5080/api', 'http://localhost:5000/api'] : ['/api'];
+const bases = ['/api'];
 
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
     const token = sessionStorage.getItem('guardlab_admin_token');
