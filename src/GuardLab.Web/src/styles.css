@@ -1,0 +1,162 @@
+:root {
+    color-scheme: dark;
+    font: 16px/1.5 system-ui, sans-serif;
+    background: #0d1422;
+    color: #e8eef8
+}
+
+* {
+    box-sizing: border-box
+}
+
+body {
+    margin: 0
+}
+
+header {
+    border-bottom: 1px solid #26354e;
+    background: #121d30;
+    padding: 18px max(24px, calc((100% - 1100px) / 2));
+    display: flex;
+    gap: 16px;
+    align-items: center
+}
+
+header span {
+    color: #91a2be;
+    font-size: 14px
+}
+
+nav {
+    margin-left: auto
+}
+
+a {
+    color: #c8d5eb;
+    text-decoration: none
+}
+
+main {
+    max-width: 1100px;
+    margin: auto;
+    padding: 36px 24px 64px
+}
+
+.hero {
+    margin-bottom: 32px
+}
+
+h1 {
+    font-size: clamp(32px, 5vw, 54px);
+    line-height: 1.1
+}
+
+.cards {
+    display: grid;
+    grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));
+    gap: 16px
+}
+
+.card, .lab-card {
+    background: #17243a;
+    border: 1px solid #2a3a55;
+    border-radius: 14px;
+    padding: 20px
+}
+
+.lab-card:hover {
+    border-color: #7481ff
+}
+
+.theory, .notice {
+    white-space: pre-line;
+    background: #223653;
+    border-radius: 8px;
+    padding: 14px;
+    margin: 18px 0
+}
+
+.error {
+    background: #54283a
+}
+
+.form {
+    display: grid;
+    gap: 12px;
+    max-width: 650px;
+    margin: 18px 0
+}
+
+label {
+    display: grid;
+    gap: 6px;
+    color: #b8c6db
+}
+
+input, textarea, select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #3b4c68;
+    border-radius: 8px;
+    background: #101a2a;
+    color: #e8eef8
+}
+
+textarea {
+    min-height: 100px
+}
+
+button {
+    border: 0;
+    border-radius: 8px;
+    padding: 10px 14px;
+    background: #5965e8;
+    color: #fff;
+    cursor: pointer;
+    margin: 4px
+}
+
+.secondary {
+    background: #26354e
+}
+
+.results {
+    display: grid;
+    grid-template-columns:1fr 1fr;
+    gap: 12px
+}
+
+pre {
+    white-space: pre-wrap;
+    background: #0d1422;
+    padding: 14px;
+    border-radius: 8px;
+    overflow: auto
+}
+
+.admin-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid #2a3a55
+}
+
+.auth {
+    max-width: 450px;
+    margin: auto
+}
+
+@media (max-width: 700px) {
+    main {
+        padding: 24px 16px
+    }
+
+    .results {
+        grid-template-columns:1fr
+    }
+
+    .admin-row {
+        display: grid
+    }
+}
