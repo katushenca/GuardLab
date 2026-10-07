@@ -19,6 +19,20 @@
       timeout: 3s
       retries: 10
 
+  db-init:
+    build:
+      context: .
+      dockerfile: src/GuardLab.DbMigrator/Dockerfile
+    environment:
+      ConnectionStrings__Platform: "Host=postgres;Port=5432;Database=guardlab;Username=db_owner;Password=${DB_OWNER_PASSWORD:?Set DB_OWNER_PASSWORD in .env}"
+      ConnectionStrings__Sandbox: "Host=postgres;Port=5432;Database=guardlab;Username=db_owner;Password=${DB_OWNER_PASSWORD:?Set DB_OWNER_PASSWORD in .env}"
+      Admin__Email: ${ADMIN_EMAIL:?Set ADMIN_EMAIL in .env}
+      Admin__Password: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   api:
     build:
       context: .
@@ -31,11 +45,9 @@
       Jwt__SigningKey: ${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY in .env}
       Jwt__Issuer: ${JWT_ISSUER:-GuardLab}
       Jwt__Audience: ${JWT_AUDIENCE:-GuardLab.Api}
-      Admin__Email: ${ADMIN_EMAIL:?Set ADMIN_EMAIL in .env}
-      Admin__Password: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
     depends_on:
-      postgres:
-        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
 
   web:
     build:

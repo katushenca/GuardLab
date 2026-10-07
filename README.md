@@ -11,38 +11,15 @@ GuardLab -  учебная платформа на C# для практики в
 
 ### Первый запуск пустой базы
 
-Перед первым запуском надо задать в `.env` JWT-ключ длиной не менее 32 байт. 
-После запуска PostgreSQL надо применить EF Core migrations от имени роли db_owner, затем загрузить учебные данные:
+Перед первым запуском надо задать в `.env` JWT-ключ длиной не менее 32 байт. `docker compose up --build` автоматически запускает PostgreSQL,  db-init, миграции, учебные seed-скрипты и seed администратора
 
 ```
-docker compose up -d postgres
-
-$env:GUARDLAB_PLATFORM_CONNECTION = "Host=localhost;Port=15432;Database=guardlab;Username=db_owner;Password=значение-DB_OWNER_PASSWORD"
-$env:GUARDLAB_SANDBOX_CONNECTION = "Host=localhost;Port=15432;Database=guardlab;Username=db_owner;Password=значение-DB_OWNER_PASSWORD"
-
-dotnet ef database update --project src\GuardLab.Infrastructure --startup-project src\GuardLab.Api --context PlatformDbContext
-dotnet ef database update --project src\GuardLab.Infrastructure --startup-project src\GuardLab.Api --context SandboxDbContext
-
-$postgresContainer = docker compose ps -q postgres
-docker cp infra\postgres\03-seed.sql "${postgresContainer}:/tmp/03-seed.sql"
-docker cp infra\postgres\04-idor-guids.sql "${postgresContainer}:/tmp/04-idor-guids.sql"
-docker compose exec -T postgres psql -U guardlab_bootstrap -d guardlab -f /tmp/03-seed.sql
-docker compose exec -T postgres psql -U guardlab_bootstrap -d guardlab -f /tmp/04-idor-guids.sql
-
-docker compose up -d
+docker compose up --build
 ```
 
-Если команда `dotnet ef` не установлена:
+db-init запускается при каждом docker compose up
 
-```
-dotnet tool install --global dotnet-ef
-```
-
-Миграции создают таблицы, 03-seed.sql добавляет опубликованную IDOR-лабораторию и синтетические данные Alice/Bob, 
-а API при запуске создаёт администратора из ADMIN_EMAIL и ADMIN_PASSWORD.
-Для полностью чистого повторного запуска сначала: docker compose down -v
-
-Для запуска API из IDE или PowerShell нужно оставить PostgreSQL в Docker (`docker compose up -d postgres`) и настроить локальные секреты:
+Для запуска API из IDE или PowerShell нужно запустить PostgreSQL и init-контейнер (`docker compose up --build -d postgres db-init`), затем настроить локальные секреты:
 
 ```
 dotnet user-secrets init --project src\GuardLab.Api
