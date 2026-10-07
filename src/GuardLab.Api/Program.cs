@@ -1,7 +1,6 @@
 using GuardLab.Api;
 using GuardLab.Application;
 using GuardLab.Infrastructure;
-using GuardLab.Infrastructure.Persistence.Platform;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,12 +23,6 @@ builder.Services
     .AddGuardLabInfrastructure(builder.Configuration);
 
 var app = builder.Build();
-
-using (var scope = app.Services.CreateScope())
-{
-    var adminSeeder = scope.ServiceProvider.GetRequiredService<AdminUserSeeder>();
-    await adminSeeder.SeedAsync();
-}
 
 app.UseExceptionHandler();
 app.UseMiddleware<RequestLoggingMiddleware>();
