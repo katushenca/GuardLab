@@ -1,0 +1,68 @@
+﻿apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: guardlab-api
+  namespace: guardlab
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: guardlab-api
+  template:
+    metadata:
+      labels:
+        app: guardlab-api
+    spec:
+      containers:
+        - name: api # так nginx фронта будет обращаться к api
+          image: guardlab-api:1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: PLATFORM_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: guardlab-secrets
+                  key: PLATFORM_DB_PASSWORD
+            - name: SANDBOX_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: guardlab-secrets
+                  key: SANDBOX_DB_PASSWORD
+            - name: ConnectionStrings__Platform
+              value: Host=postgres;Port=5432;Database=guardlab;Username=platform_app;Password=$(PLATFORM_DB_PASSWORD)
+            - name: ConnectionStrings__Sandbox
+              value: Host=postgres;Port=5432;Database=guardlab;Username=lab_app;Password=$(SANDBOX_DB_PASSWORD)
+            - name: ASPNETCORE_ENVIRONMENT
+              value: Production
+            - name: ASPNETCORE_URLS
+              value: http://+:8080
+            - name: Jwt__SigningKey
+              valueFrom:
+                secretKeyRef:
+                  name: guardlab-secrets
+                  key: JWT_SIGNING_KEY
+            - name: Jwt__Issuer
+              valueFrom:
+                secretKeyRef:
+                  name: guardlab-secrets
+                  key: JWT_ISSUER
+            - name: Jwt__Audience
+              valueFrom:
+                secretKeyRef:
+                  name: guardlab-secrets
+                  key: JWT_AUDIENCE
+          readinessProbe: # для проверки готовности приложения, пока не готово, не будет принимать запросы
+            httpGet:
+              path: /api/health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe: # перезапуск приложения, если он упал
+            httpGet:
+              path: /api/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10

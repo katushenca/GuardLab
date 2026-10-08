@@ -1,0 +1,54 @@
+﻿apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-migrator
+  namespace: guardlab
+spec:
+  backoffLimit: 4 # колво попыток
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app: db-migrator
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+        - name: wait-for-postgres # ждем пока запустится postgres
+          image: postgres:17-alpine # надо для psql
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: guardlab-secrets
+                  key: DB_OWNER_PASSWORD
+          command: ["sh", "-c"]
+          args:
+            - >-
+              until PGPASSWORD="$PGPASSWORD" psql -h postgres -p 5432 -U db_owner
+              -d guardlab -c "select 1" >/dev/null 2>&1;
+              do echo "wait postgres 67"; sleep 2; done
+      containers:
+        - name: db-migrator # запускаем мигратор
+          image: guardlab-db-migrator:1.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: DB_OWNER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: guardlab-secrets
+                  key: DB_OWNER_PASSWORD
+            - name: Admin__Email
+              valueFrom:
+                secretKeyRef:
+                  name: guardlab-secrets
+                  key: ADMIN_EMAIL
+            - name: Admin__Password
+              valueFrom:
+                secretKeyRef:
+                  name: guardlab-secrets
+                  key: ADMIN_PASSWORD
+            - name: ConnectionStrings__Platform
+              value: Host=postgres;Port=5432;Database=guardlab;Username=db_owner;Password=$(DB_OWNER_PASSWORD)
+            - name: ConnectionStrings__Sandbox
+              value: Host=postgres;Port=5432;Database=guardlab;Username=db_owner;Password=$(DB_OWNER_PASSWORD)
