@@ -1,0 +1,28 @@
+﻿apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  namespace: guardlab
+data:
+  01-init-roles.sql: |
+    \getenv db_owner_password DB_OWNER_PASSWORD
+    \getenv platform_password PLATFORM_DB_PASSWORD
+    \getenv sandbox_password SANDBOX_DB_PASSWORD
+
+    CREATE ROLE db_owner LOGIN PASSWORD :'db_owner_password';
+    CREATE ROLE platform_app LOGIN PASSWORD :'platform_password';
+    CREATE ROLE lab_app LOGIN PASSWORD :'sandbox_password';
+
+    GRANT CONNECT ON DATABASE guardlab TO db_owner, platform_app, lab_app;
+    CREATE SCHEMA platform AUTHORIZATION db_owner;
+    CREATE SCHEMA sandbox AUTHORIZATION db_owner;
+    GRANT USAGE ON SCHEMA platform TO platform_app;
+    GRANT USAGE ON SCHEMA sandbox TO lab_app;
+    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA platform TO platform_app;
+    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA platform TO platform_app;
+    GRANT SELECT ON ALL TABLES IN SCHEMA sandbox TO lab_app;
+    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA sandbox TO lab_app;
+    ALTER DEFAULT PRIVILEGES FOR ROLE db_owner IN SCHEMA platform GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO platform_app;
+    ALTER DEFAULT PRIVILEGES FOR ROLE db_owner IN SCHEMA platform GRANT USAGE, SELECT ON SEQUENCES TO platform_app;
+    ALTER DEFAULT PRIVILEGES FOR ROLE db_owner IN SCHEMA sandbox GRANT SELECT ON TABLES TO lab_app;
+    ALTER DEFAULT PRIVILEGES FOR ROLE db_owner IN SCHEMA sandbox GRANT USAGE, SELECT ON SEQUENCES TO lab_app;

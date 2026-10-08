@@ -1,0 +1,28 @@
+﻿apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: guardlab-web
+  namespace: guardlab
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: guardlab-web
+  template:
+    metadata:
+      labels:
+        app: guardlab-web
+    spec:
+      containers:
+        - name: web
+          image: guardlab-web:1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
