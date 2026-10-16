@@ -166,3 +166,29 @@ Middleware записывает метод, путь, статус и длите
 - `src/GuardLab.Infrastructure` - инфраструктурные реализации (по типу репозиториев для postgres)
 - `src/GuardLab.Web` - React/TypeScript frontend и Vite
 - `infra/postgres` - роли, таблицы схем
+
+## Алерт по логам API через vmalert
+
+Алерт проверяет логи Warning из запроса течение последних пяти минут
+Условие должно сохраняться одну минуту, vmalert выполняет правило раз в минуту
+Alertmanager показывает состояние алерта в UI
+
+```
+kubectl apply -f infra/manifests/13-alertmanager.yaml
+kubectl rollout status deployment/alertmanager -n guardlab --timeout=180s
+kubectl apply -f infra/manifests/14-vmalert.yaml
+kubectl rollout status deployment/vmalert -n guardlab --timeout=180s
+```
+
+
+```
+kubectl port-forward -n guardlab svc/vmalert 8880:8880
+```
+
+```
+kubectl port-forward -n guardlab svc/alertmanager 9093:9093
+```
+
+Интерфейс vmalert:http://localhost:8880/ 
+Полученные алерты Alertmanager: http://localhost:9093/#/alerts
+Алёрты тут: http://localhost:8880/vmalert/alerts?search=#group-4708710682925592581
