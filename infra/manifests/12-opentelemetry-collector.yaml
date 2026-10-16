@@ -1,0 +1,171 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: otel-collector
+  namespace: guardlab
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: guardlab-otel-collector
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "namespaces"] # что можно читать
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["replicasets"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding #связываем роль с суз
+metadata:
+  name: guardlab-otel-collector
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: guardlab-otel-collector
+subjects:
+  - kind: ServiceAccount
+    name: otel-collector
+    namespace: guardlab
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-collector-config
+  namespace: guardlab
+data:
+  collector.yaml: |
+    extensions:
+      file_storage/offsets:
+        directory: /var/lib/otelcol/offsets
+
+    receivers:
+      filelog:
+        include: #откуда логи читаем
+          - /var/log/pods/guardlab_guardlab-api-*_*/*/*.log
+          - /var/log/pods/guardlab_db-migrator-*_*/*/*.log
+        start_at: beginning
+        include_file_path: true
+        storage: file_storage/offsets
+        operators:
+          - id: container-parser
+            type: container
+          - id: json-router
+            type: router
+            routes:
+              - expr: 'body matches "^\\s*\\{"' #проверяем json или нет
+                output: app-json-parser
+              - expr: 'true'
+                output: passthrough
+          - id: app-json-parser
+            type: json_parser
+            parse_from: body
+            parse_to: attributes
+            on_error: send
+            output: passthrough
+          - id: passthrough
+            type: noop
+
+    processors:
+      k8sattributes: #добавляем данные про кубер
+        auth_type: serviceAccount
+        filter:
+          node_from_env_var: K8S_NODE_NAME
+        extract:
+          metadata:
+            - k8s.namespace.name
+            - k8s.pod.name
+            - k8s.pod.uid
+            - k8s.node.name
+            - k8s.deployment.name
+            - k8s.container.name
+            - container.image.name
+            - container.image.tag
+        pod_association:
+          - sources:
+              - from: resource_attribute
+                name: k8s.pod.uid
+      batch:
+        timeout: 5s
+        send_batch_size: 256
+
+    exporters:
+      otlphttp/victoria_logs: #сюда уходят записи
+        logs_endpoint: http://victoria-logs.guardlab.svc.cluster.local:9428/insert/opentelemetry/v1/logs
+
+    service:
+      extensions: [file_storage/offsets]
+      pipelines:
+        logs:
+          receivers: [filelog]
+          processors: [k8sattributes, batch]
+          exporters: [otlphttp/victoria_logs]
+---
+#по одному Collector на каждой ноде, hostPath даёт доступ к логам ноды
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: otel-collector
+  namespace: guardlab
+  labels:
+    app.kubernetes.io/name: otel-collector
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: otel-collector
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: otel-collector
+    spec:
+      serviceAccountName: otel-collector
+      containers:
+        - name: otel-collector
+          image: otel/opentelemetry-collector-contrib:0.145.0
+          args: ["--config=/conf/collector.yaml"]
+          # Запускаем от root, чтобы читать файлы ноды
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+          env:
+            - name: K8S_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: config
+              mountPath: /conf
+              readOnly: true
+            - name: pod-logs
+              mountPath: /var/log/pods
+              readOnly: true
+            # volumes - откуда взять папку, volume-mounts - где будет видна внутри коллектора
+            - name: docker-container-logs
+              mountPath: /var/lib/docker/containers
+              readOnly: true
+            - name: offsets
+              mountPath: /var/lib/otelcol/offsets
+      volumes:
+        - name: config
+          configMap:
+            name: otel-collector-config
+        - name: pod-logs
+          hostPath:
+            path: /var/log/pods
+            type: Directory
+        - name: docker-container-logs
+          hostPath:
+            path: /var/lib/docker/containers
+            type: Directory
+        - name: offsets
+          hostPath:
+            path: /var/lib/otelcol/offsets
+            type: DirectoryOrCreate

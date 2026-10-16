@@ -9,7 +9,8 @@ namespace GuardLab.Api.Controllers;
 [ApiController]
 [Route("api/admin/labs")]
 [Authorize(Roles = "admin")]
-public sealed class AdminLabsController(LabAdminService labs, LabRunService runs) : ControllerBase
+public sealed class AdminLabsController(LabAdminService labs, LabRunService runs, ILogger<AdminLabsController> logger)
+    : ControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> List(CancellationToken cancellationToken) =>
@@ -55,6 +56,8 @@ public sealed class AdminLabsController(LabAdminService labs, LabRunService runs
         try
         {
             var created = await labs.CreateAsync(lab, cancellationToken);
+            logger.LogInformation("Application event {EventName} action {Action} labId {LabId} actorId {ActorId}",
+                "admin.lab", "created", created.Id, User.FindFirst("sub")?.Value);
             return CreatedAtAction(nameof(Get), new { id = created.Id }, AdminLabResponse.From(created));
         }
         catch (DuplicateLabSlugException ex)
@@ -74,6 +77,8 @@ public sealed class AdminLabsController(LabAdminService labs, LabRunService runs
         {
             lab.TransitionTo(request.Status);
             await labs.UpdateAsync(lab, cancellationToken);
+            logger.LogInformation("Application event {EventName} action {Action} labId {LabId} actorId {ActorId}",
+                "admin.lab", "updated", lab.Id, User.FindFirst("sub")?.Value);
             return Ok(AdminLabResponse.From(lab));
         }
         catch (DuplicateLabSlugException ex)
@@ -91,7 +96,11 @@ public sealed class AdminLabsController(LabAdminService labs, LabRunService runs
     {
         try
         {
-            return await labs.ArchiveAsync(id, cancellationToken) ? NoContent() : NotFound();
+            var archived = await labs.ArchiveAsync(id, cancellationToken);
+            if (archived)
+                logger.LogInformation("Application event {EventName} action {Action} labId {LabId} actorId {ActorId}",
+                    "admin.lab", "archived", id, User.FindFirst("sub")?.Value);
+            return archived ? NoContent() : NotFound();
         }
         catch (InvalidOperationException ex)
         {
@@ -104,7 +113,11 @@ public sealed class AdminLabsController(LabAdminService labs, LabRunService runs
     {
         try
         {
-            return await labs.RestoreAsync(id, cancellationToken) ? NoContent() : NotFound();
+            var restored = await labs.RestoreAsync(id, cancellationToken);
+            if (restored)
+                logger.LogInformation("Application event {EventName} action {Action} labId {LabId} actorId {ActorId}",
+                    "admin.lab", "restored", id, User.FindFirst("sub")?.Value);
+            return restored ? NoContent() : NotFound();
         }
         catch (InvalidOperationException ex)
         {

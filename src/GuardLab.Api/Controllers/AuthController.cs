@@ -5,7 +5,7 @@ namespace GuardLab.Api.Controllers;
 
 [ApiController]
 [Route("api/auth")]
-public sealed class AuthController(AdminAuthService authService) : ControllerBase
+public sealed class AuthController(AdminAuthService authService, ILogger<AuthController> logger) : ControllerBase
 {
     [HttpPost("login")]
     public async Task<IActionResult> Login(
@@ -13,9 +13,20 @@ public sealed class AuthController(AdminAuthService authService) : ControllerBas
         CancellationToken cancellationToken)
     {
         var result = await authService.LoginAsync(request.Email, request.Password, cancellationToken);
-        return result is null
-            ? Unauthorized(new { error = "invalid_credentials" })
-            : Ok(result);
+        if (result is null)
+        {
+            logger.LogWarning(
+                "Application event {EventName} outcome {Outcome}",
+                "auth.login",
+                "failure");
+            return Unauthorized(new { error = "invalid_credentials" });
+        }
+
+        logger.LogInformation(
+            "Application event {EventName} outcome {Outcome}",
+            "auth.login",
+            "success");
+        return Ok(result);
     }
 }
 
