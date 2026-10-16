@@ -1,0 +1,83 @@
+# Запрашиваем у Kubernetes хранилище для логов
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: victoria-logs-data
+  namespace: guardlab
+spec:
+  # Одновременно том будет подключён только к одному поду
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: victoria-logs
+  namespace: guardlab 
+  labels:
+    app.kubernetes.io/name: victoria-logs
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # сначала старый останавливаем потом новый запускаепм
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: victoria-logs
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: victoria-logs
+    spec:
+      containers:
+        - name: victoria-logs
+          image: victoriametrics/victoria-logs:v1.53.0
+          args:
+            #сюда данные записываем
+            - -storageDataPath=/victoria-logs-data
+          ports:
+            - name: http
+              containerPort: 9428
+              protocol: TCP
+          #направляет запросы только в под, где открыт хттп порт.
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 1
+              memory: 1Gi
+          volumeMounts:
+            - name: data
+              mountPath: /victoria-logs-data
+      volumes:
+        - name: data
+          persistentVolumeClaim: # подключаем pvc
+            claimName: victoria-logs-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: victoria-logs
+  namespace: guardlab
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: victoria-logs
+  ports:
+    - name: http
+      port: 9428
+      targetPort: http
+      protocol: TCP

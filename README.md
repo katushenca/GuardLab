@@ -9,6 +9,76 @@ GuardLab -  учебная платформа на C# для практики в
 3. Открыть <http://localhost:8080>. Swagger API доступен через <http://localhost:8080/swagger>
 4. Остановка: `docker compose down`. Чтобы удалить локальные данные базы - `docker compose down -v`
 
+## Запуск в minikube
+### 1. Запустить кластер и подготовить секреты
+
+```
+minikube start -p minikube
+kubectl config use-context minikube
+```
+
+### 2. Собрать и загрузить образы
+```
+docker build -t guardlab-api:1.0 -f src/GuardLab.Api/Dockerfile .
+minikube image load guardlab-api:1.0
+
+docker build -t guardlab-web:1.0 -f src/GuardLab.Web/Dockerfile .
+minikube image load guardlab-web:1.0
+
+docker build -t guardlab-db-migrator:1.0 -f src/GuardLab.DbMigrator/Dockerfile .
+minikube image load guardlab-db-migrator:1.0
+```
+
+### 3. Применить манифесты
+```
+kubectl apply -f infra/manifests/1-namespace.yaml
+kubectl apply -f infra/manifests/2-secrets.yaml
+kubectl apply -f infra/manifests/3-pg-configmap.yaml
+kubectl apply -f infra/manifests/5-pg-service.yaml
+kubectl apply -f infra/manifests/4-pg-statefulset.yaml
+kubectl rollout status statefulset/postgres -n guardlab --timeout=180s
+
+kubectl apply -f infra/manifests/6-migrator-job.yaml
+kubectl wait --for=condition=complete job/db-migrator -n guardlab --timeout=300s
+
+kubectl apply -f infra/manifests/7-api-deployment.yaml
+kubectl apply -f infra/manifests/8-api-service.yaml
+kubectl apply -f infra/manifests/9-front-deployment.yaml
+kubectl apply -f infra/manifests/10-front-service.yaml
+
+kubectl rollout status deployment/guardlab-api -n guardlab --timeout=180s
+kubectl rollout status deployment/guardlab-web -n guardlab --timeout=180s
+kubectl get pods,services,pvc -n guardlab
+```
+
+### 4. Victoria Logs и OpenTelemetry коллектор
+
+Victoria Logs хранит данные в PVC
+Collector запускается как DaemonSet
+```
+kubectl apply -f infra/manifests/11-victoria-logs.yaml
+kubectl rollout status deployment/victoria-logs -n guardlab --timeout=180s
+
+kubectl apply -f infra/manifests/12-opentelemetry-collector.yaml
+kubectl rollout status daemonset/otel-collector -n guardlab --timeout=180s
+```
+
+```
+kubectl port-forward -n guardlab svc/victoria-logs 9428:9428
+```
+
+ http://localhost:9428/select/vmui/
+
+```
+minikube service guardlab-web -n guardlab --url
+```
+
+
+Остановить кластер, сохранив его данные:
+
+```powershell
+minikube stop -p minikube
+```
 ### Первый запуск пустой базы
 
 Перед первым запуском надо задать в `.env` JWT-ключ длиной не менее 32 байт. `docker compose up --build` автоматически запускает PostgreSQL,  db-init, миграции, учебные seed-скрипты и seed администратора
@@ -96,3 +166,29 @@ Middleware записывает метод, путь, статус и длите
 - `src/GuardLab.Infrastructure` - инфраструктурные реализации (по типу репозиториев для postgres)
 - `src/GuardLab.Web` - React/TypeScript frontend и Vite
 - `infra/postgres` - роли, таблицы схем
+
+## Алерт по логам API через vmalert
+
+Алерт проверяет логи Warning из запроса течение последних пяти минут
+Условие должно сохраняться одну минуту, vmalert выполняет правило раз в минуту
+Alertmanager показывает состояние алерта в UI
+
+```
+kubectl apply -f infra/manifests/13-alertmanager.yaml
+kubectl rollout status deployment/alertmanager -n guardlab --timeout=180s
+kubectl apply -f infra/manifests/14-vmalert.yaml
+kubectl rollout status deployment/vmalert -n guardlab --timeout=180s
+```
+
+
+```
+kubectl port-forward -n guardlab svc/vmalert 8880:8880
+```
+
+```
+kubectl port-forward -n guardlab svc/alertmanager 9093:9093
+```
+
+Интерфейс vmalert:http://localhost:8880/ 
+Полученные алерты Alertmanager: http://localhost:9093/#/alerts
+Алёрты тут: http://localhost:8880/vmalert/alerts?search=#group-4708710682925592581
