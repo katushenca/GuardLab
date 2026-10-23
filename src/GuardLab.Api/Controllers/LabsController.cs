@@ -1,5 +1,6 @@
 using GuardLab.Application.Labs;
 using GuardLab.Application.Labs.IdorKeyAccess;
+using GuardLab.Api.Metrics;
 using Microsoft.AspNetCore.Mvc;
 
 namespace GuardLab.Api.Controllers;
@@ -26,17 +27,27 @@ public sealed class LabsController(LabCatalogService catalog, LabRunService runs
     public async Task<ActionResult<LabRunResult>> Run(string slug, [FromBody] RunLabRequest request, CancellationToken cancellationToken)
     {
         var lab = await catalog.GetBySlugAsync(slug, cancellationToken);
-        if (lab is null) return NotFound();
+        if (lab is null)
+        {
+            GuardLabMetrics.RecordLabRun("rejected");
+            return NotFound();
+        }
         try
         {
-            return Ok(await runs.RunAsync(lab.Id, request.Sid, request.KeyId, cancellationToken));
+            var result = await runs.RunAsync(lab.Id, request.Sid, request.KeyId, cancellationToken);
+            GuardLabMetrics.RecordLabRun("success");
+            GuardLabMetrics.RecordKeyAccess("vulnerable", result.VulnerableStatusCode);
+            GuardLabMetrics.RecordKeyAccess("safe", result.SafeStatusCode);
+            return Ok(result);
         }
         catch (ArgumentException ex)
         {
+            GuardLabMetrics.RecordLabRun("rejected");
             return BadRequest(new { error = ex.Message });
         }
         catch (InvalidOperationException)
         {
+            GuardLabMetrics.RecordLabRun("rejected");
             return NotFound();
         }
     }

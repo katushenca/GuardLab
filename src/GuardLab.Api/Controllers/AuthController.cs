@@ -1,4 +1,5 @@
 using GuardLab.Application.AdminAuth;
+using GuardLab.Api.Metrics;
 using Microsoft.AspNetCore.Mvc;
 
 namespace GuardLab.Api.Controllers;
@@ -15,6 +16,7 @@ public sealed class AuthController(AdminAuthService authService, ILogger<AuthCon
         var result = await authService.LoginAsync(request.Email, request.Password, cancellationToken);
         if (result is null)
         {
+            GuardLabMetrics.RecordLoginAttempt("failure");
             logger.LogWarning(
                 "Application event {EventName} outcome {Outcome}",
                 "auth.login",
@@ -22,6 +24,7 @@ public sealed class AuthController(AdminAuthService authService, ILogger<AuthCon
             return Unauthorized(new { error = "invalid_credentials" });
         }
 
+        GuardLabMetrics.RecordLoginAttempt("success");
         logger.LogInformation(
             "Application event {EventName} outcome {Outcome}",
             "auth.login",
