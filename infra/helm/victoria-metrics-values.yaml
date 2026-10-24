@@ -1,0 +1,71 @@
+grafana:
+  enabled: false
+
+vmsingle:
+  enabled: true
+  spec:
+    retentionPeriod: "7d"
+    replicaCount: 1
+
+vmagent:
+  enabled: true
+  # Чтобы vmagent из namespace monitoring мог обнаруживать поды из другого ns
+  rbac:
+    namespaced: false
+  spec:
+    scrapeInterval: 15s
+    # автоматически не собираем, через аннотации 
+    selectAllByDefault: false
+    # собираем по аннотациям с помощью sd
+    # цели - поды
+    # дальше смотрим поды с аннотациями и собираем путь по которым метрики будем собирать
+    inlineScrapeConfig: |
+      - job_name: guardlab-pods
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - guardlab
+        relabel_configs:
+          - action: keep
+            source_labels:
+              - __meta_kubernetes_pod_annotation_prometheus_io_scrape
+            regex: "true"
+          - action: replace
+            source_labels:
+              - __meta_kubernetes_pod_annotation_prometheus_io_path
+            target_label: __metrics_path__
+            regex: (.+)
+          - action: replace
+            source_labels:
+              - __address__
+              - __meta_kubernetes_pod_annotation_prometheus_io_port
+            target_label: __address__
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+#пока не надо, откючила
+vmalert:
+  enabled: false
+
+alertmanager:
+  enabled: false
+
+defaultRules:
+  enabled: false
+
+kube-state-metrics:
+  enabled: false
+
+prometheus-node-exporter:
+  enabled: false
+
+kubeApiServer:
+  enabled: false
+kubelet:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeEtcd:
+  enabled: false
+kubeScheduler:
+  enabled: false

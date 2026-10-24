@@ -1,4 +1,5 @@
 using GuardLab.Application.Labs;
+using GuardLab.Api.Metrics;
 using GuardLab.Core.Labs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -28,7 +29,11 @@ public sealed class AdminLabsController(LabAdminService labs, LabRunService runs
         CancellationToken cancellationToken)
     {
         var lab = await labs.GetByIdAsync(id, cancellationToken);
-        if (lab is null) return NotFound();
+        if (lab is null)
+        {
+            GuardLabMetrics.RecordLabRun("rejected");
+            return NotFound();
+        }
         if (lab.Slug != "idor-key-access")
             return Conflict(new
             {
@@ -37,10 +42,15 @@ public sealed class AdminLabsController(LabAdminService labs, LabRunService runs
             });
         try
         {
-            return Ok(await runs.RunAsync(id, request.Sid, request.KeyId, cancellationToken));
+            var result = await runs.RunAsync(id, request.Sid, request.KeyId, cancellationToken);
+            GuardLabMetrics.RecordLabRun("success");
+            GuardLabMetrics.RecordKeyAccess("vulnerable", result.VulnerableStatusCode);
+            GuardLabMetrics.RecordKeyAccess("safe", result.SafeStatusCode);
+            return Ok(result);
         }
         catch (ArgumentException ex)
         {
+            GuardLabMetrics.RecordLabRun("rejected");
             return BadRequest(new { error = "invalid_training_input", message = ex.Message });
         }
     }
@@ -56,6 +66,7 @@ public sealed class AdminLabsController(LabAdminService labs, LabRunService runs
         try
         {
             var created = await labs.CreateAsync(lab, cancellationToken);
+            GuardLabMetrics.RecordLabLifecycleAction("created");
             logger.LogInformation("Application event {EventName} action {Action} labId {LabId} actorId {ActorId}",
                 "admin.lab", "created", created.Id, User.FindFirst("sub")?.Value);
             return CreatedAtAction(nameof(Get), new { id = created.Id }, AdminLabResponse.From(created));
@@ -77,6 +88,7 @@ public sealed class AdminLabsController(LabAdminService labs, LabRunService runs
         {
             lab.TransitionTo(request.Status);
             await labs.UpdateAsync(lab, cancellationToken);
+            GuardLabMetrics.RecordLabLifecycleAction("updated");
             logger.LogInformation("Application event {EventName} action {Action} labId {LabId} actorId {ActorId}",
                 "admin.lab", "updated", lab.Id, User.FindFirst("sub")?.Value);
             return Ok(AdminLabResponse.From(lab));
@@ -98,8 +110,11 @@ public sealed class AdminLabsController(LabAdminService labs, LabRunService runs
         {
             var archived = await labs.ArchiveAsync(id, cancellationToken);
             if (archived)
+            {
+                GuardLabMetrics.RecordLabLifecycleAction("archived");
                 logger.LogInformation("Application event {EventName} action {Action} labId {LabId} actorId {ActorId}",
                     "admin.lab", "archived", id, User.FindFirst("sub")?.Value);
+            }
             return archived ? NoContent() : NotFound();
         }
         catch (InvalidOperationException ex)
@@ -115,8 +130,11 @@ public sealed class AdminLabsController(LabAdminService labs, LabRunService runs
         {
             var restored = await labs.RestoreAsync(id, cancellationToken);
             if (restored)
+            {
+                GuardLabMetrics.RecordLabLifecycleAction("restored");
                 logger.LogInformation("Application event {EventName} action {Action} labId {LabId} actorId {ActorId}",
                     "admin.lab", "restored", id, User.FindFirst("sub")?.Value);
+            }
             return restored ? NoContent() : NotFound();
         }
         catch (InvalidOperationException ex)

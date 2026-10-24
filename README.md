@@ -192,3 +192,7 @@ kubectl port-forward -n guardlab svc/alertmanager 9093:9093
 Интерфейс vmalert:http://localhost:8880/ 
 Полученные алерты Alertmanager: http://localhost:9093/#/alerts
 Алёрты тут: http://localhost:8880/vmalert/alerts?search=#group-4708710682925592581
+
+
+# Метрики
+См. infra/helm/README.md

@@ -1,0 +1,46 @@
+# настраивает пользователя для экспортера
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: postgres-exporter-user-setup
+  namespace: guardlab
+spec:
+  backoffLimit: 10
+  activeDeadlineSeconds: 600
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: create-exporter-user
+          image: postgres:17-alpine
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: guardlab-secrets
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_EXPORTER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-exporter-credentials
+                  key: POSTGRES_EXPORTER_PASSWORD
+          command: ["sh", "-c"]
+          args:
+            - >-
+              psql --host postgres --username guardlab_bootstrap --dbname postgres
+              --set ON_ERROR_STOP=1
+              --set exporter_password="$POSTGRES_EXPORTER_PASSWORD"
+              --file /etc/postgres-init/02-postgres-exporter-user.sql
+          volumeMounts:
+            - name: postgres-init
+              mountPath: /etc/postgres-init
+              readOnly: true
+      volumes:
+        - name: postgres-init
+          configMap:
+            name: postgres-init
+            items:
+              - key: 02-postgres-exporter-user.sql
+                path: 02-postgres-exporter-user.sql

@@ -12,6 +12,10 @@ spec:
     metadata:
       labels:
         app: guardlab-api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
     spec:
       containers:
         - name: api # так nginx фронта будет обращаться к api

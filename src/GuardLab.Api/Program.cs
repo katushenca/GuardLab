@@ -1,6 +1,8 @@
 using GuardLab.Api;
 using GuardLab.Application;
 using GuardLab.Infrastructure;
+using Prometheus;
+using Prometheus.DotNetRuntime;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,10 +28,19 @@ builder.Services
     .AddGuardLabApi(builder.Configuration)
     .AddGuardLabApplication()
     .AddGuardLabInfrastructure(builder.Configuration);
-
 var app = builder.Build();
+// подключают сбор метрик .NET Runtime
+var runtimeMetrics = DotNetRuntimeStatsBuilder.Default().StartCollecting();
+app.Lifetime.ApplicationStopped.Register(runtimeMetrics.Dispose);
 
 app.UseExceptionHandler();
+app.UseRouting(); 
+app.UseHttpMetrics(options =>
+{
+    // чтобы не увеличивать кардинальность из-за запросов с айдишниками
+    options.AddCustomLabel("route", context =>
+        (context.GetEndpoint() as RouteEndpoint)?.RoutePattern.RawText ?? "unmatched");
+});
 app.UseMiddleware<RequestLoggingMiddleware>();
 if (app.Environment.IsDevelopment())
 {
@@ -44,5 +55,6 @@ app.UseSwaggerUI(options =>
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapMetrics();
 
 app.Run();
