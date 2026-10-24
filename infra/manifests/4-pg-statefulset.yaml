@@ -6,6 +6,8 @@ metadata:
 spec:
   serviceName: postgres
   replicas: 1
+  updateStrategy:
+    type: RollingUpdate
   selector:
     matchLabels:
       app: postgres
@@ -13,6 +15,10 @@ spec:
     metadata:
       labels:
         app: postgres
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9187"
+        prometheus.io/path: "/metrics"
     spec:
       containers:
         - name: postgres
@@ -63,6 +69,42 @@ spec:
               mountPath: /docker-entrypoint-initdb.d/01-init-roles.sql # файл с командами для инициализации БД
               subPath: 01-init-roles.sql
               readOnly: true
+        - name: postgres-exporter
+          image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: DATA_SOURCE_URI
+              value: 127.0.0.1:5432/guardlab?sslmode=disable
+            - name: DATA_SOURCE_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-exporter-credentials
+                  key: POSTGRES_EXPORTER_USER
+            - name: DATA_SOURCE_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-exporter-credentials
+                  key: POSTGRES_EXPORTER_PASSWORD
+          ports:
+            - name: metrics
+              containerPort: 9187
+          readinessProbe:
+            tcpSocket:
+              port: 9187
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 9187
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
       volumes:
         - name: postgres-init
           configMap:
