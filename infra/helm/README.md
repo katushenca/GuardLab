@@ -75,3 +75,15 @@ kubectl port-forward -n guardlab pod/postgres-0 9187:9187
 и можно открыть /metrics:
 http://localhost:9187/metrics
 
+## Grafana
+
+Grafana включена через настройки infra/helm/victoria-metrics-values.yaml. 
+Helm-чарт автоматически добавляет VictoriaMetrics как datasource.
+
+После изменения values обновить Helm-релиз:
+    helm upgrade --install vm-single vm/victoria-metrics-k8s-stack --namespace monitoring --create-namespace --version 0.96.0 --values infra/helm/victoria-metrics-values.yaml --wait --timeout 10m
+
+Запустить port-forward:
+    kubectl port-forward -n monitoring svc/vm-single-victoria-metrics-k8s-stack-grafana 3000:80
+
+Открыть http://localhost:3000. login = admin. Пароль хранится в Secret - kubectl get secrets -n monitoring | Select-String grafana

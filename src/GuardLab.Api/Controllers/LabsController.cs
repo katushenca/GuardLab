@@ -9,6 +9,10 @@ namespace GuardLab.Api.Controllers;
 [Route("api/labs")]
 public sealed class LabsController(LabCatalogService catalog, LabRunService runs) : ControllerBase
 {
+    private string MetricSource => string.Equals(Request.Headers["X-GuardLab-Probe"], "synthetic", StringComparison.OrdinalIgnoreCase)
+        ? "synthetic"
+        : "user";
+
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<LabSummaryResponse>>> List(CancellationToken cancellationToken)
     {
@@ -29,25 +33,25 @@ public sealed class LabsController(LabCatalogService catalog, LabRunService runs
         var lab = await catalog.GetBySlugAsync(slug, cancellationToken);
         if (lab is null)
         {
-            GuardLabMetrics.RecordLabRun("rejected");
+            GuardLabMetrics.RecordLabRun("rejected", MetricSource);
             return NotFound();
         }
         try
         {
             var result = await runs.RunAsync(lab.Id, request.Sid, request.KeyId, cancellationToken);
-            GuardLabMetrics.RecordLabRun("success");
-            GuardLabMetrics.RecordKeyAccess("vulnerable", result.VulnerableStatusCode);
-            GuardLabMetrics.RecordKeyAccess("safe", result.SafeStatusCode);
+            GuardLabMetrics.RecordLabRun("success", MetricSource);
+            GuardLabMetrics.RecordKeyAccess("vulnerable", result.VulnerableStatusCode, MetricSource);
+            GuardLabMetrics.RecordKeyAccess("safe", result.SafeStatusCode, MetricSource);
             return Ok(result);
         }
         catch (ArgumentException ex)
         {
-            GuardLabMetrics.RecordLabRun("rejected");
+            GuardLabMetrics.RecordLabRun("rejected", MetricSource);
             return BadRequest(new { error = ex.Message });
         }
         catch (InvalidOperationException)
         {
-            GuardLabMetrics.RecordLabRun("rejected");
+            GuardLabMetrics.RecordLabRun("rejected", MetricSource);
             return NotFound();
         }
     }
