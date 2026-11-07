@@ -196,3 +196,17 @@ kubectl port-forward -n guardlab svc/alertmanager 9093:9093
 
 # Метрики
 См. infra/helm/README.md
+
+## Алерты по метрикам приложения и .NET
+
+infra/manifests/16-metric-alerts.yaml запускает отдельный vmalert для правил (т.к. существующий для логов)
+
+
+```
+docker build -t guardlab-api:1.0 -f src/GuardLab.Api/Dockerfile .
+minikube image load guardlab-api:1.0
+kubectl rollout restart deployment/guardlab-api -n guardlab
+helm upgrade --install vm-single vm/victoria-metrics-k8s-stack --namespace monitoring --create-namespace --version 0.96.0 --values infra/helm/victoria-metrics-values.yaml --wait --timeout 10m
+kubectl apply -f infra/manifests/16-metric-alerts.yaml
+kubectl rollout status deployment/vmalert-metrics -n guardlab --timeout=180s
+```
