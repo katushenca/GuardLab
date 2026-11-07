@@ -1,10 +1,10 @@
 grafana:
-  enabled: false
+  enabled: true
 
 vmsingle:
   enabled: true
   spec:
-    retentionPeriod: "7d"
+    retentionPeriod: "35d"
     replicaCount: 1
 
 vmagent:
@@ -43,6 +43,54 @@ vmagent:
             target_label: __address__
             regex: ([^:]+)(?::\d+)?;(\d+)
             replacement: $1:$2
+      - job_name: guardlab-probe-api
+        metrics_path: /probe
+        params:
+          module: [http_2xx]
+        static_configs:
+          - targets:
+              - http://api.guardlab.svc.cluster.local:8080/metrics
+        relabel_configs:
+          - source_labels: [__address__]
+            target_label: __param_target
+          - source_labels: [__param_target]
+            target_label: instance
+          - target_label: __address__
+            replacement: guardlab-blackbox-exporter.monitoring.svc.cluster.local:9115
+          - target_label: probe
+            replacement: api_metrics
+      - job_name: guardlab-probe-postgres
+        metrics_path: /probe
+        params:
+          module: [tcp_connect]
+        static_configs:
+          - targets:
+              - postgres.guardlab.svc.cluster.local:5432
+        relabel_configs:
+          - source_labels: [__address__]
+            target_label: __param_target
+          - source_labels: [__param_target]
+            target_label: instance
+          - target_label: __address__
+            replacement: guardlab-blackbox-exporter.monitoring.svc.cluster.local:9115
+          - target_label: probe
+            replacement: postgres_tcp
+      - job_name: guardlab-probe-idor-scenario
+        metrics_path: /probe
+        params:
+          module: [http_idor_scenario]
+        static_configs:
+          - targets:
+              - http://api.guardlab.svc.cluster.local:8080/api/labs/idor-key-access/run
+        relabel_configs:
+          - source_labels: [__address__]
+            target_label: __param_target
+          - source_labels: [__param_target]
+            target_label: instance
+          - target_label: __address__
+            replacement: guardlab-blackbox-exporter.monitoring.svc.cluster.local:9115
+          - target_label: probe
+            replacement: idor_scenario
 #пока не надо, откючила
 vmalert:
   enabled: false

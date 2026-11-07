@@ -8,14 +8,14 @@ public static class GuardLabMetrics
     private static readonly Counter LabRuns = Prometheus.Metrics.CreateCounter(
         "guardlab_lab_runs_total",
         "Number of GuardLab scenario run attempts.",
-        labelNames: new[] { "result" });
+        labelNames: new[] { "result", "source" });
 
     // Сравнивает результат проверки ключа у уязвимой и защищённой реализаций
     // Полезно, чтобы по мониторингу понимать, что с задумкой всё ок и защищенная реализация реально работает
     private static readonly Counter KeyAccesses = Prometheus.Metrics.CreateCounter(
         "guardlab_lab_key_access_total",
         "Number of key access checks performed by each lab implementation.",
-        labelNames: new[] { "implementation", "result" });
+        labelNames: new[] { "implementation", "result", "source" });
 
     // Показывает число успешных и неуспешных попыток входа администратора по результату
     private static readonly Counter LoginAttempts = Prometheus.Metrics.CreateCounter(
@@ -29,9 +29,11 @@ public static class GuardLabMetrics
         "Number of successful laboratory lifecycle actions.",
         labelNames: new[] { "action" });
 
-    public static void RecordLabRun(string result) => LabRuns.WithLabels(result).Inc();
+    public static void RecordLabRun(string result) => RecordLabRun(result, "user");
 
-    public static void RecordKeyAccess(string implementation, int statusCode)
+    public static void RecordLabRun(string result, string source) => LabRuns.WithLabels(result, source).Inc();
+
+    public static void RecordKeyAccess(string implementation, int statusCode, string source = "user")
     {
         var result = statusCode switch
         {
@@ -40,7 +42,7 @@ public static class GuardLabMetrics
             _ => "not_found"
         };
 
-        KeyAccesses.WithLabels(implementation, result).Inc();
+        KeyAccesses.WithLabels(implementation, result, source).Inc();
     }
 
     public static void RecordLoginAttempt(string result) => LoginAttempts.WithLabels(result).Inc();
