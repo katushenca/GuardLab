@@ -30,7 +30,9 @@ builder.Services
     .AddGuardLabInfrastructure(builder.Configuration);
 var app = builder.Build();
 // подключают сбор метрик .NET Runtime
-var runtimeMetrics = DotNetRuntimeStatsBuilder.Default().StartCollecting();
+var runtimeMetrics = DotNetRuntimeStatsBuilder.Default()
+    .WithThreadPoolStats(CaptureLevel.Informational)
+    .StartCollecting();
 app.Lifetime.ApplicationStopped.Register(runtimeMetrics.Dispose);
 
 app.UseExceptionHandler();
