@@ -30,6 +30,11 @@ public sealed class RequestLoggingMiddleware(RequestDelegate next, ILogger<Reque
             finally
             {
                 stopwatch.Stop();
+                if (context.Request.ContentLength is long requestSize)
+                    Metrics.GuardLabMetrics.ObserveHttpRequestSize(requestSize);
+
+                if (context.Response.ContentLength is long responseSize)
+                    Metrics.GuardLabMetrics.ObserveHttpResponseSize(responseSize);
 
                 var isSuccessfulHealthCheck = routeTemplate == "api/health"
                                               && context.Response.StatusCode < StatusCodes.Status400BadRequest;
@@ -53,4 +58,5 @@ public sealed class RequestLoggingMiddleware(RequestDelegate next, ILogger<Reque
             }
         }
     }
+
 }
