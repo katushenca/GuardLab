@@ -17,6 +17,10 @@ data:
     receivers:
       #alertmanager примет алерт и покажет его в UI, но никуда не отправит - можно доп настроить отправку на почту и тд
       - name: guardlab
+        telegram_configs:
+          - bot_token_file: /var/run/secrets/alertmanager/bot-token
+            chat_id: -5596397326
+            send_resolved: true
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -50,12 +54,21 @@ spec:
               readOnly: true
             - name: data
               mountPath: /alertmanager
+            - name: telegram-secret
+              mountPath: /var/run/secrets/alertmanager
+              readOnly: true
       volumes:
         - name: config
           configMap:
             name: guardlab-alertmanager-config
         - name: data
           emptyDir: {}
+        - name: telegram-secret
+          secret:
+            secretName: guardlab-secrets
+            items:
+              - key: TELEGRAM_BOT_TOKEN
+                path: bot-token
 ---
 apiVersion: v1
 kind: Service
