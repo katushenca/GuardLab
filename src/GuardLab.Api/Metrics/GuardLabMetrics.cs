@@ -29,6 +29,19 @@ public static class GuardLabMetrics
         "Number of successful laboratory lifecycle actions.",
         labelNames: new[] { "action" });
 
+    private static readonly Histogram HttpRequestSize = Prometheus.Metrics.CreateHistogram(
+        "http_request_size_bytes",
+        "Declared HTTP request body size in bytes from Content-Length.",
+        new HistogramConfiguration { Buckets = Histogram.ExponentialBuckets(128, 2, 12) });
+
+    private static readonly Histogram HttpResponseSize = Prometheus.Metrics.CreateHistogram(
+        "http_response_size_bytes",
+        "Declared HTTP response body size in bytes from Content-Length.",
+        new HistogramConfiguration { Buckets = Histogram.ExponentialBuckets(128, 2, 12) });
+
+    public static void ObserveHttpRequestSize(long bytes) => HttpRequestSize.Observe(Math.Max(0, bytes));
+
+    public static void ObserveHttpResponseSize(long bytes) => HttpResponseSize.Observe(Math.Max(0, bytes));
     public static void RecordLabRun(string result) => RecordLabRun(result, "user");
 
     public static void RecordLabRun(string result, string source) => LabRuns.WithLabels(result, source).Inc();

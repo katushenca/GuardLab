@@ -1,5 +1,10 @@
 grafana:
   enabled: true
+  persistence:
+    enabled: true
+    type: pvc
+    storageClassName: standard
+    size: 5Gi
 
 vmsingle:
   enabled: true
