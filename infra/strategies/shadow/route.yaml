@@ -1,0 +1,34 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: guardlab-api
+  namespace: guardlab
+spec:
+  parentRefs:
+    - name: guardlab-gateway
+  rules:
+    - matches:
+        - path:
+            type: Exact
+            value: /api/labs
+          method: GET
+      filters:
+        - type: RequestMirror
+          requestMirror:
+            backendRef:
+              group: ""
+              kind: Service
+              name: api-shadow
+              port: 8080
+      backendRefs:
+        - name: api
+          port: 8080
+          weight: 100
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api
+      backendRefs:
+        - name: api
+          port: 8080
+          weight: 100

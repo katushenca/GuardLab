@@ -7,6 +7,9 @@ namespace GuardLab.Api.Controllers;
 [Route("api/health")]
 public sealed class HealthController(HealthService healthService, ILogger<HealthController> logger) : ControllerBase
 {
+    [HttpGet("live")]
+    public IActionResult Live() => Ok(new { status = "ok" });
+
     [HttpGet]
     public async Task<IActionResult> Get(CancellationToken cancellationToken)
     {

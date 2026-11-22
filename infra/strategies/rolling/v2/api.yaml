@@ -1,0 +1,17 @@
+spec:
+  minReadySeconds: 15
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        version: "2.0.0"
+    spec:
+      containers:
+        - name: api
+          env:
+            - name: APP_VERSION
+              value: "2.0.0"
