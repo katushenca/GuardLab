@@ -1,10 +1,12 @@
 using GuardLab.Api;
+using GuardLab.Api.Metrics;
 using GuardLab.Application;
 using GuardLab.Infrastructure;
 using Prometheus;
 using Prometheus.DotNetRuntime;
 
 var builder = WebApplication.CreateBuilder(args);
+var appVersion = builder.Configuration["APP_VERSION"] ?? "unknown";
 
 builder.Logging.ClearProviders();
 builder.Logging.AddJsonConsole(options =>
@@ -29,6 +31,19 @@ builder.Services
     .AddGuardLabApplication()
     .AddGuardLabInfrastructure(builder.Configuration);
 var app = builder.Build();
+GuardLabMetrics.SetAppVersion(appVersion);
+
+app.Use(async (context, next) =>
+{
+    context.Response.OnStarting(() =>
+    {
+        context.Response.Headers["X-GuardLab-Version"] = appVersion;
+        return Task.CompletedTask;
+    });
+
+    await next();
+});
+
 // подключают сбор метрик .NET Runtime
 var runtimeMetrics = DotNetRuntimeStatsBuilder.Default()
     .WithThreadPoolStats(CaptureLevel.Informational)
@@ -36,10 +51,11 @@ var runtimeMetrics = DotNetRuntimeStatsBuilder.Default()
 app.Lifetime.ApplicationStopped.Register(runtimeMetrics.Dispose);
 
 app.UseExceptionHandler();
-app.UseRouting(); 
+app.UseRouting();
 app.UseHttpMetrics(options =>
 {
     // чтобы не увеличивать кардинальность из-за запросов с айдишниками
+    options.AddCustomLabel("version", _ => appVersion);
     options.AddCustomLabel("route", context =>
         (context.GetEndpoint() as RouteEndpoint)?.RoutePattern.RawText ?? "unmatched");
 });

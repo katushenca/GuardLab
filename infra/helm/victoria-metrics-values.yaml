@@ -18,7 +18,7 @@ vmagent:
   rbac:
     namespaced: false
   spec:
-    scrapeInterval: 15s
+    scrapeInterval: 5s
     # автоматически не собираем, через аннотации 
     selectAllByDefault: false
     # собираем по аннотациям с помощью sd

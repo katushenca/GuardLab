@@ -1,10 +1,10 @@
-﻿apiVersion: apps/v1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: guardlab-api
   namespace: guardlab
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: guardlab-api
@@ -12,6 +12,7 @@ spec:
     metadata:
       labels:
         app: guardlab-api
+        version: "1.0.0"
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "8080"
@@ -25,6 +26,8 @@ spec:
             - name: http
               containerPort: 8080
           env:
+            - name: APP_VERSION
+              value: "1.0.0"
             - name: PLATFORM_DB_PASSWORD
               valueFrom:
                 secretKeyRef:
@@ -64,9 +67,9 @@ spec:
               port: 8080
             initialDelaySeconds: 10
             periodSeconds: 5
-          livenessProbe: # перезапуск приложения, если он упал
+          livenessProbe: # проверяет только, что процесс API отвечает и не перезапускает его из-за БД
             httpGet:
-              path: /api/health
+              path: /api/health/live
               port: 8080
             initialDelaySeconds: 30
             periodSeconds: 10
